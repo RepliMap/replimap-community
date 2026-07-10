@@ -11,13 +11,12 @@
 </p>
 
 <p align="center">
-  Reverse-engineer any AWS account. Visualize dependencies. Generate Terraform. Optimize costs.
+  Walk into any brownfield AWS account. Scan it, map every dependency, and turn ClickOps into import-ready Terraform. 100% on your machine.
 </p>
 
 <p align="center">
   <a href="#quick-start">Quick Start</a> •
   <a href="#features">Features</a> •
-  <a href="#use-cases">Use Cases</a> •
   <a href="#-limitations--scope">Limitations</a> •
   <a href="#-frequently-asked-questions">FAQ</a> •
   <a href="#documentation">Docs</a>
@@ -46,16 +45,16 @@
 </p>
 
 <p align="center">
-  <img src="assets/demo-scan.png" alt="RepliMap Demo" width="700" />
+  <img src="assets/demo-scan.gif" alt="RepliMap scan demo — masked credentials, live progress" width="700" />
 </p>
 
 ---
 
 > **👋 About This Repository**
 > RepliMap is a **commercial tool** built with a **"Local-First"** architecture.
-> This repository (`replimap-community`) hosts **documentation**, **issue tracking**, and **examples**.
-> The core engine is distributed via [PyPI](https://pypi.org/project/replimap/).
-> Your AWS credentials and data **never leave your machine** — the only network call is license key validation.
+> This repository (`replimap-community`) hosts **documentation** and **issue tracking**.
+> The engine is distributed via [PyPI](https://pypi.org/project/replimap/).
+> Your AWS credentials and infrastructure data **never leave your machine** — the only network call is license validation, and generated reports load nothing from the internet.
 
 ---
 
@@ -66,19 +65,20 @@
 
 ## 💡 TL;DR
 
-**RepliMap** is a read-only CLI tool that reverse-engineers existing AWS infrastructure into production-ready Terraform code.
+**RepliMap** is a read-only CLI tool that reverse-engineers existing AWS infrastructure into a Terraform adoption starting point — clean resource files plus an import scaffold that validates on day one.
 
 **Core capabilities:**
 - **Graph Engine**: Uses Tarjan's algorithm to detect Strongly Connected Components (SCCs) and automatically resolve circular dependencies (e.g., Security Groups referencing each other)
+- **IaC Coverage**: Matches your live account against your Terraform state files and reports what exists in **none of them** — the question `terraform plan` structurally cannot answer
 - **Smart Sanitization**: Filters read-only fields (like `root_block_device.device_name`) that cause accidental resource destruction on `terraform apply`
 - **Local-First**: Your AWS credentials and infrastructure data never leave your machine
 
 **Use RepliMap when:**
 - You inherited a ClickOps AWS account and need Terraform
 - `terraform import` keeps failing with cycle errors
-- You need to clone prod to staging without manual work
+- You need to prove what exists (and what nobody manages) for a hand-off or audit
 
-**Keywords**: AWS, Terraform, Infrastructure as Code, IaC, reverse engineering, circular dependencies, Tarjan algorithm, SCC, brownfield migration, ClickOps to GitOps, Security Group cycles, terraform import alternative
+**Keywords**: AWS, Terraform, Infrastructure as Code, IaC, reverse engineering, circular dependencies, Tarjan algorithm, SCC, brownfield migration, ClickOps to GitOps, Security Group cycles, terraform import alternative, IaC coverage
 
 ---
 
@@ -87,31 +87,32 @@
 You inherited an AWS account. Or maybe you built it yourself over 3 years of "just one more click."
 
 Now you have:
-- 🤷 **500+ resources** and no idea what connects to what
-- 😰 **No Terraform** — everything was ClickOps
-- 💸 **Oversized instances** burning money 24/7
-- 📋 **SOC2 audit next month** — good luck
+- 🤷 **Hundreds of resources** and no idea what connects to what
+- 😰 **No Terraform** — or a state file that covers half of what's really there
+- 📋 **A hand-off (or an audit) coming** — and no way to prove what exists
 
 Sound familiar?
 
 ## The Solution
 
-**RepliMap scans your AWS, builds a dependency graph, and gives you superpowers.**
+**RepliMap scans your AWS, builds a dependency graph, and turns it into deliverables.**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                                                                         │
 │   $ replimap -p prod scan                                               │
 │                                                                         │
-│   ✓ Scanned 847 resources in 23.4s                                      │
-│   ✓ Mapped 1,203 dependencies                                           │
-│   ✓ Found 12 compliance issues                                          │
-│   ✓ Identified $2,847/month in savings                                  │
+│   ✓ Found 1,584 resources                                               │
+│   ✓ Mapped 1,470 dependencies                                           │
 │                                                                         │
-│   Your infrastructure graph is ready.                                   │
+│   Next: replimap graph / codify                                         │
 │                                                                         │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
+
+That's real output from a 1,584-resource production account — the same account
+where IaC coverage found the entire data layer, all 27 RDS instances, in no
+Terraform state at all.
 
 ---
 
@@ -119,451 +120,115 @@ Sound familiar?
 
 ### 🔍 Scan & Understand
 
-**See your infrastructure like never before.**
+**See what actually exists — and what breaks if you touch it.**
 
-RepliMap builds a complete dependency graph of your AWS account using a sophisticated graph engine. Finally understand what connects to what — and what breaks if you touch it.
+RepliMap builds a complete dependency graph of your AWS account. Parallel
+scanners cover 1,500+ resource accounts in minutes, with per-item retries so a
+transient AWS error never silently drops a resource.
 
 ```bash
 # Scan your AWS account
 replimap -p prod -r ap-southeast-2 scan
 
-# Visualize dependencies
+# Visualize dependencies — one self-contained HTML file, renders air-gapped
 replimap -p prod -r us-east-1 graph -o architecture.html
 
 # "What happens if I delete this security group?"
 replimap -p prod -r us-east-1 deps sg-0a1b2c3d4e
 ```
 
-<details>
-<summary>📸 See example dependency graph</summary>
-
-```
-                    ┌─────────────┐
-                    │   ALB       │
-                    │ (public)    │
-                    └──────┬──────┘
-                           │
-              ┌────────────┼────────────┐
-              │            │            │
-        ┌─────▼─────┐ ┌────▼────┐ ┌─────▼─────┐
-        │  EC2 #1   │ │  EC2 #2 │ │  EC2 #3   │
-        │ (web)     │ │  (web)  │ │  (web)    │
-        └─────┬─────┘ └────┬────┘ └─────┬─────┘
-              │            │            │
-              └────────────┼────────────┘
-                           │
-                    ┌──────▼──────┐
-                    │     RDS     │
-                    │  (primary)  │
-                    └──────┬──────┘
-                           │
-                    ┌──────▼──────┐
-                    │ ElastiCache │
-                    │  (redis)    │
-                    └─────────────┘
-```
-
-</details>
+The interactive graph nests resources into their VPC/subnet containers, and
+clicking any node highlights its blast radius. D3 is inlined — zero CDN, zero
+outbound requests — so you can open it on an air-gapped machine or hand it to
+a client as-is.
 
 ### 🏗️ Codify: ClickOps to Terraform
 
 **Stop writing HCL by hand. Let the engine do it.**
 
-You built your infrastructure in the console. Now you need to manage it with code. `codify` scans your existing resources and generates production-ready Terraform, complete with `import` blocks to sync your state instantly.
+`codify` scans your existing resources and generates a Terraform **adoption
+starting point** — clean resource files grouped per service, plus an import
+scaffold with the correct import ID format for every resource type.
 
 ```bash
-# Reverse-engineer your existing infrastructure
 replimap codify -p prod -r us-east-1 -o ./terraform
 
-# Example output
-Authenticated as arn:aws:sts::123456789012:assumed-role/admin/user
-Using cached scan (2m ago) • 1,772 resources • 1,655 dependencies
-
-# Output structure (18 files)
+# Output structure
 terraform/
-├── README.md
-├── alb.tf
-├── backend.tf
-├── compute.tf
-├── ec2.tf
-├── elasticache.tf
-├── iam_roles.tf
-├── imports.tf        # Terraform 1.5+ import blocks
-├── messaging.tf
-├── monitoring.tf
-├── networking.tf
-├── rds.tf
-├── s3.tf
-├── security_groups.tf
-├── storage.tf
-├── tfplan.txt
-├── variables.tf
-└── vpc.tf
+├── vpc.tf / networking.tf / security_groups.tf
+├── ec2.tf / compute.tf / alb.tf
+├── rds.tf / elasticache.tf / s3.tf / storage.tf / messaging.tf
+├── providers.tf / versions.tf
+└── imports.tf        # import scaffold (Pro) — one block per resource
 ```
 
-**Why RepliMap's code generation is different:**
+**Why RepliMap's generation holds up on real accounts:**
 
 - ✅ **Handles `root_block_device` defaults** — prevents accidental EC2 replacement ([see the trap](https://www.reddit.com/r/devops/comments/1qiun82/psa_the_root_block_device_gotcha_that_almost_cost/))
 - ✅ **Resolves circular dependencies** — auto-splits Security Group rules
 - ✅ **Filters AWS system tags** — no more `aws:*` tag rejection errors
-- ✅ **Extracts variables** — not just hardcoded values
+- ✅ **Lifecycle protection** — `prevent_destroy` on databases and storage by default
+- ✅ **Validates on day one** — run `terraform init && terraform validate` on the output immediately
 
-**Supported IaC formats:**
-- ✅ Terraform (HCL)
-- 🔜 CloudFormation (YAML/JSON)
-- 🔜 Pulumi (TypeScript)
-- 🔜 CDK (TypeScript)
+The free tier generates every resource `.tf` file for the whole account, so
+you can judge the quality before paying for anything.
 
-### 👯 Clone & Right-Size Environments
+### 📊 IaC Coverage: What Does Nobody Manage?
 
-**Stop paying production prices for dev environments.**
+**The question `terraform plan` structurally cannot answer.**
 
-Need a staging environment that mirrors production? Don't just copy it—optimize it.
-RepliMap's `clone` command duplicates your architecture but automatically downsizes instances (e.g., `m5.2xlarge` → `t3.medium`) and strips sensitive data, saving you 40-60% on non-prod costs.
-
-```bash
-# Clone prod to staging with automatic cost optimization
-replimap clone --profile prod --region us-east-1 --output-dir ./staging-tf --rename-pattern "prod:staging" --mode generate
-
-# See what you'll save before applying
-replimap -p prod -r us-east-1 cost
-```
-
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        💰 Right-Sizer Report                            │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Resource              Original (Prod)  Clone (Dev)      Monthly Savings│
-│  ─────────────────────────────────────────────────────────────────────  │
-│  web-server-1          m5.2xlarge       t3.large         $198.56        │
-│  rds-cluster           db.r5.2xlarge    db.r5.large      $365.00        │
-│  elasticache           r6g.xlarge       r6g.large        $131.40        │
-│                                                                         │
-│  ─────────────────────────────────────────────────────────────────────  │
-│  TOTAL MONTHLY SAVINGS                                 $1,017.62        │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
-
-### ✅ Audit Compliance
-
-**Find compliance gaps before your auditor does.**
-
-Built-in security and compliance scanning powered by industry-standard rules. Get actionable findings with auto-generated remediation code.
+`terraform plan` only sees what's already in state. IaC Coverage matches your
+live account against one or more state files and reports what exists in
+**none of them** — triaged into real ClickOps, embedded resources (e.g. EBS
+volumes owned by an instance), and likely auto-created (service-linked roles).
 
 ```bash
-# Run compliance audit
+# Match live resources against your state files (local or S3)
+replimap codify -p prod \
+  --coverage-state s3://tf-states/prod/terraform.tfstate \
+  --coverage-state-dir ./states
+```
+
+Everyone gets the per-type counts and coverage percentage; the full resource
+list and machine-readable `coverage.json` are Pro.
+
+### ✅ Audit Evidence
+
+**Evidence, not screenshots.**
+
+Run a SOC 2-mapped audit against live AWS (Checkov-powered) and export the
+findings as an evidence package your auditor can actually use. Frameworks:
+SOC 2, APRA CPS 234, RBNZ BS11, NZISM.
+
+```bash
+# Full terminal summary (score, grade, top issues) — free
 replimap -p prod -r us-east-1 audit
 
-# Generate fix code (from audit JSON output)
-replimap -p prod -r us-east-1 audit --format json -o audit_report.json
-replimap remediate audit_report.json -o ./fixes
+# HTML report + SOC 2 evidence export — Pro
+replimap audit -p prod --state ./terraform.tfstate
 ```
 
-```
-┌─────────────────────────────────────────────────────────────────────────┐
-│                        🔒 Compliance Report                             │
-├─────────────────────────────────────────────────────────────────────────┤
-│                                                                         │
-│  Framework: SOC2 Type II                                                │
-│  Resources Scanned: 847                                                 │
-│  Findings: 12                                                           │
-│                                                                         │
-│  ┌────────────────────────────────────────────────────────────────────┐ │
-│  │ 🔴 CRITICAL (2)                                                    │ │
-│  │    • S3 bucket 'logs-prod' has public access enabled               │ │
-│  │    • RDS instance 'main-db' not encrypted at rest                  │ │
-│  │                                                                    │ │
-│  │ 🟡 HIGH (4)                                                        │ │
-│  │    • Security group sg-xxx allows 0.0.0.0/0 on port 22            │ │
-│  │    • IAM user 'deploy-bot' has inline policies                     │ │
-│  │    • CloudTrail not enabled in ap-southeast-2                      │ │
-│  │    • EBS volumes not encrypted by default                          │ │
-│  │                                                                    │ │
-│  │ 🟢 MEDIUM (6)                                                      │ │
-│  │    • [View full report: ./audit-report.html]                       │ │
-│  └────────────────────────────────────────────────────────────────────┘ │
-│                                                                         │
-└─────────────────────────────────────────────────────────────────────────┘
-```
+### 🛡️ IAM Generation
 
-### 🔄 Detect Drift
-
-**Know when reality diverges from your Terraform.**
-
-Compare your actual AWS state against your Terraform code. Catch ClickOps changes before they cause incidents.
+**Least-privilege policies from actual dependencies.**
 
 ```bash
-# Detect drift from local state file
-replimap -p prod -r us-east-1 drift --state ./terraform.tfstate
-
-# Detect drift from remote S3 state
-replimap -p prod -r us-east-1 drift --state-bucket my-tf-state --state-key prod/terraform.tfstate
-
-# Output
-Drift detected in 3 resources:
-  • aws_security_group.web: ingress rule added (port 8080)
-  • aws_instance.api: instance_type changed (t3.large → t3.xlarge)
-  • aws_s3_bucket.logs: versioning disabled
+replimap iam for-resource -p prod -r i-0abc123 -s runtime_read
 ```
+
+Graph-aware traversal generates permissions only for the resources your
+workload actually touches, with precise ARNs.
+
+### 🔄 Drift — an honest note
+
+Attribute-level drift comparison ships free and is marked **experimental** —
+on real accounts, `terraform plan` is still the better answer for "did what I
+manage change?". What RepliMap ships and stands behind is the opposite
+question: **IaC Coverage** — what exists that no state file manages.
 
 ---
 
-## Use Cases
-
-### 🚀 Startup Scale-Up
-
-> "We built everything in the console. Now we need Terraform."
-
-Stop the painful manual migration. RepliMap reverse-engineers your entire infrastructure and generates production-ready IaC. From ClickOps to GitOps in an afternoon, not a quarter.
-
-### 🧪 Test & Staging Environments
-
-> "I need a copy of prod for testing. By tomorrow."
-
-Spin up production-identical environments in minutes, not days:
-
-- **Legacy Project Handoff** — Inherited a mess? Scan it, clone it, understand it.
-- **Ephemeral Test Environments** — Replicate prod, run tests, destroy. Rinse and repeat.
-- **Chaos Engineering** — Clone prod for Chaos Monkey experiments without risking the real thing.
-- **DR Drills** — Quarterly disaster recovery exercises? One command to duplicate your entire stack.
-
-```bash
-# Clone prod to staging with cost-optimized instances
-replimap clone --profile prod --region us-east-1 --output-dir ./staging-tf --rename-pattern "prod:staging" --mode generate
-
-# Test complete? Destroy with confidence
-cd staging-tf && terraform destroy
-```
-
-### 💸 FinOps & Cost Optimization
-
-> "We're spending $50k/month but don't know where it goes."
-
-RepliMap maps every resource, identifies waste, and shows exactly where to cut. Right-size instances, find unused resources, optimize reserved capacity. See savings before you commit.
-
-### 🔒 SOC2 / ISO27001 Preparation
-
-> "Audit is in 30 days. We have no documentation."
-
-RepliMap generates architecture diagrams, compliance reports, and remediation code. Turn audit prep from months to days. Auditors love the dependency graphs.
-
-### 🏢 M&A Due Diligence
-
-> "We're acquiring a company. What does their AWS look like?"
-
-RepliMap gives you complete visibility into any AWS account in minutes. Understand architecture quality, compliance posture, and cost structure — before signing the term sheet.
-
-### 🌍 Disaster Recovery
-
-> "We need to replicate prod to another region. Yesterday."
-
-Clone your entire infrastructure to a DR region with one command. All dependencies mapped, all configurations preserved. Test your DR plan without the drama.
-
----
-
-## Quick Start
-
-### Installation
-
-```bash
-# Using pipx (recommended - isolated environment)
-pipx install replimap
-
-# Using pip
-pip install replimap
-
-# Verify installation
-replimap --version
-```
-
-### Your First Scan
-
-```bash
-# 1. Configure AWS credentials (if not already done)
-aws configure --profile myaccount
-
-# 2. Scan your infrastructure
-replimap -p myaccount -r us-east-1 scan
-
-# 3. Explore the results
-replimap -p myaccount -r us-east-1 graph -o architecture.html
-open architecture.html
-```
-
-### Generate Terraform
-
-```bash
-# Generate Terraform from scanned infrastructure
-replimap codify -p prod -r us-east-1 -o ./terraform
-
-# Review and apply
-cd terraform
-terraform init
-terraform plan
-```
-
----
-
-## 📖 Commands
-
-| Command | Description |
-|---------|-------------|
-| `replimap scan` | Scan AWS resources and build dependency graph |
-| `replimap codify` | Transform ClickOps AWS infrastructure into production-ready Terraform code |
-| `replimap clone` | Clone AWS environment to Infrastructure-as-Code with cost optimization |
-| `replimap graph` | Generate visual dependency graph |
-| `replimap analyze` | Analyze graph for critical resources, SPOFs, blast radius |
-| `replimap deps` | Explore dependencies for a resource |
-| `replimap cost` | Estimate monthly AWS costs |
-| `replimap audit` | Run security audit on AWS infrastructure |
-| `replimap drift` | Detect infrastructure drift between Terraform state and AWS |
-| `replimap remediate` | Generate Terraform remediation code from audit JSON |
-
-<details>
-<summary>View all commands</summary>
-
-```bash
-replimap --help
-
-Usage: replimap [OPTIONS] COMMAND [ARGS]...
-
-AWS Infrastructure Intelligence Engine
-
-Options:
-  --quiet               -q            Suppress verbose output
-  --version             -V            Show version and exit
-  --privacy                           Show privacy and data handling information
-  --profile             -p      TEXT  AWS profile name (can also be set per-command)
-  --region              -r      TEXT  AWS region (can also be set per-command)
-  --help                -h            Show this message and exit.
-
-Core Commands:
-  scan            Scan AWS resources and build dependency graph.
-  graph           Generate visual dependency graph of AWS infrastructure.
-  load            Load and display a saved graph.
-  profiles        List available AWS profiles.
-
-Infrastructure as Code:
-  clone           Clone AWS environment to Infrastructure-as-Code.
-  codify          Transform ClickOps AWS infrastructure into production-ready Terraform code.
-  remediate       Generate Terraform remediation code from an audit JSON file.
-
-Analysis:
-  analyze         Analyze a resource dependency graph for critical infrastructure.
-  deps            Explore dependencies for a resource.
-  drift           Detect infrastructure drift between Terraform state and AWS.
-  validate        Validate infrastructure against topology constraints.
-  drift-offline   Offline drift detection
-
-Cost Optimization:
-  cost            Estimate monthly AWS costs for your infrastructure.
-  unused          Detect unused and underutilized AWS resources.
-  trends          Analyze AWS cost trends and detect anomalies.
-  transfer        Analyze data transfer costs and optimization opportunities.
-
-Security & Compliance:
-  audit           Run security audit on AWS infrastructure.
-  iam             Generate least-privilege IAM policies from graph analysis
-  trust-center    Trust Center API auditing for compliance
-
-Configuration:
-  doctor          Run environment health checks.
-  cache           Credential cache management
-  scan-cache      Scan result cache management
-  license         License management commands
-  upgrade         Upgrade your RepliMap plan
-  completion      Generate shell completion scripts
-  decisions       Manage user decisions (suppression, extraction, etc.)
-
-Help & Debugging:
-  explain         Get detailed information about an error code.
-  errors          List all error codes.
-
-Disaster Recovery:
-  snapshot        Infrastructure snapshots for change tracking
-  dr              Disaster Recovery readiness assessment
-```
-
-</details>
-
----
-
-## 🔧 Configuration
-
-### AWS Credentials
-
-RepliMap uses standard AWS credential chain:
-
-```bash
-# Option 1: AWS CLI profile (recommended)
-replimap -p prod scan
-
-# Option 2: Environment variables
-export AWS_ACCESS_KEY_ID=xxx
-export AWS_SECRET_ACCESS_KEY=xxx
-replimap scan
-
-# Option 3: IAM role (EC2/ECS/Lambda)
-replimap scan  # Auto-detects instance role
-```
-
-### Required IAM Permissions
-
-RepliMap only needs **read-only** access. See [IAM_POLICY.md](IAM_POLICY.md) for the minimal policy.
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": [
-        "ec2:Describe*",
-        "rds:Describe*",
-        "elasticache:Describe*",
-        "s3:GetBucket*",
-        "s3:ListBucket*",
-        "lambda:List*",
-        "lambda:GetFunction*"
-      ],
-      "Resource": "*"
-    }
-  ]
-}
-```
-
----
-
-## 🏗️ Architecture
-
-RepliMap is built around a **Graph Engine** powered by NetworkX. This isn't just a CLI wrapper around AWS APIs — it's an infrastructure intelligence platform.
-
-The **Graph Engine** is the secret sauce: it transforms discrete cloud resources into a connected dependency graph, enabling impact analysis, visualization, and intelligent code generation that understands relationships.
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│                         RepliMap Architecture                    │
-├──────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│   ┌─────────────┐     ┌─────────────┐     ┌─────────────┐       │
-│   │  Scanners   │────▶│ ⭐ Graph    │────▶│  Renderers  │       │
-│   │  (AWS API)  │     │   Engine ⭐ │     │  (Terraform)│       │
-│   └─────────────┘     └──────┬──────┘     └─────────────┘       │
-│                              │                                   │
-│         ┌────────────────────┼────────────────────┐             │
-│         │                    │                    │             │
-│         ▼                    ▼                    ▼             │
-│   ┌───────────┐      ┌─────────────┐      ┌───────────┐        │
-│   │   Audit   │      │ Right-Sizer │      │   Drift   │        │
-│   │  Engine   │      │   Engine    │      │  Detector │        │
-│   └───────────┘      └─────────────┘      └───────────┘        │
-│                                                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-### How It Works: The Brownfield Migration Problem
+## How It Works: The Brownfield Migration Problem
 
 RepliMap is not just a `terraform import` wrapper. It's a **graph-based engine** designed to handle the "Brownfield Migration" problem where standard tools fail.
 
@@ -610,113 +275,112 @@ If you include them in your code, Terraform shows **"must be replaced"** and tri
 
 RepliMap's Sanitizer automatically filters these dangerous fields before generating HCL.
 
-### Core Components
+---
 
-| Component | Description |
-|-----------|-------------|
-| **Graph Engine** | NetworkX-based dependency graph with Tarjan's SCC for cycle detection |
-| **Scanners** | Async AWS API clients for 20+ resource types |
-| **Renderers** | Jinja2 templates for Terraform/CloudFormation generation |
-| **Right-Sizer** | Rule-based + API cost optimization engine |
-| **Audit Engine** | Compliance scanning with Checkov integration |
+## Quick Start
+
+### Installation
+
+```bash
+# Using pipx (recommended - isolated environment)
+pipx install replimap
+
+# Using pip
+pip install replimap
+
+# Verify installation
+replimap --version
+```
+
+### Your First Scan
+
+```bash
+# 1. Configure AWS credentials (if not already done)
+aws configure --profile myaccount
+
+# 2. Scan your infrastructure
+replimap -p myaccount -r us-east-1 scan
+
+# 3. Explore the results
+replimap -p myaccount -r us-east-1 graph -o architecture.html
+open architecture.html
+```
+
+### Generate Terraform
+
+```bash
+# Generate Terraform from scanned infrastructure
+replimap codify -p prod -r us-east-1 -o ./terraform
+
+# Validate against the real provider schema
+cd terraform
+terraform init
+terraform validate
+```
+
+---
+
+## 📖 Commands
+
+| Command | Description |
+|---------|-------------|
+| `replimap scan` | Scan AWS resources and build dependency graph |
+| `replimap codify` | Turn ClickOps AWS into a Terraform adoption starting point + import scaffold |
+| `replimap graph` | Interactive dependency graph (self-contained HTML) |
+| `replimap deps` | Explore dependencies and blast radius for a resource |
+| `replimap analyze` | Critical resources, SPOFs, blast radius from the cached scan |
+| `replimap audit` | Security & compliance audit (SOC 2 / APRA / RBNZ / NZISM) |
+| `replimap iam` | Generate least-privilege IAM policies from graph analysis |
+| `replimap cost` | Estimate monthly AWS costs (estimates, clearly labeled) |
+| `replimap drift` | Drift detection between Terraform state and AWS (experimental) |
+| `replimap doctor` | Environment health checks |
+
+Run `replimap --help` for the full list (cache management, license, error
+explain, and more).
+
+---
+
+## 🔧 Configuration
+
+### AWS Credentials
+
+RepliMap uses the standard AWS credential chain:
+
+```bash
+# Option 1: AWS CLI profile (recommended)
+replimap -p prod scan
+
+# Option 2: Environment variables
+export AWS_ACCESS_KEY_ID=xxx
+export AWS_SECRET_ACCESS_KEY=xxx
+replimap scan
+
+# Option 3: IAM role (EC2/ECS)
+replimap scan  # Auto-detects instance role
+```
+
+### Required IAM Permissions
+
+RepliMap only needs **read-only** access. See [IAM_POLICY.md](IAM_POLICY.md)
+for the complete minimal policy.
 
 ### Supported Resources
 
-<details>
-<summary>View all 24 supported resource types</summary>
+RepliMap scans **30+ AWS resource types** — the core of a typical production
+account:
 
 | Category | Resources |
 |----------|-----------|
-| **Compute** | EC2, Lambda, ECS, EKS |
-| **Database** | RDS, Aurora, DynamoDB, ElastiCache |
-| **Network** | VPC, Subnet, Security Group, Route Table, NAT Gateway, Internet Gateway, ALB/NLB |
-| **Storage** | S3, EBS, EFS |
-| **Security** | IAM Role, IAM Policy, KMS Key, Secrets Manager |
-| **Other** | CloudWatch, SNS, SQS |
+| **Compute** | EC2, Auto Scaling Groups, Launch Templates, EBS, EIP |
+| **Database** | RDS (+ subnet & parameter groups), ElastiCache (+ subnet groups) |
+| **Network** | VPC, Subnet, Security Group, Route Table, NACL, IGW, NAT Gateway, VPC Endpoint, ALB/NLB (+ listeners & target groups) |
+| **Storage** | S3 buckets & bucket policies |
+| **Security** | IAM Roles, IAM Policies, Instance Profiles |
+| **Messaging & Monitoring** | SQS, SNS, CloudWatch log groups & alarms |
 
-</details>
-
----
-
-## 📊 Comparison
-
-### RepliMap vs Terraformer
-
-| Feature | RepliMap | Terraformer |
-|---------|----------|-------------|
-| Dependency Graph | ✅ Full graph with cycle detection | ❌ No dependency tracking |
-| Code Quality | ✅ Clean, modular, variables extracted | ⚠️ Verbose, hardcoded values |
-| Cost Optimization | ✅ Built-in Right-Sizer | ❌ None |
-| Compliance Audit | ✅ SOC2/CIS built-in | ❌ None |
-| Drift Detection | ✅ Yes | ❌ No |
-| Visualization | ✅ Interactive HTML graphs | ❌ None |
-| Active Development | ✅ Yes | ⚠️ Slow |
-
-### RepliMap vs Former2
-
-| Feature | RepliMap | Former2 |
-|---------|----------|---------|
-| Architecture | CLI (local) | Browser-based |
-| Large Environments | ✅ Handles 1000+ resources | ⚠️ Browser memory limits |
-| Dependency Analysis | ✅ Full graph | ⚠️ Limited |
-| Cost Analysis | ✅ Yes | ❌ No |
-| Data Privacy | ✅ Data stays local | ⚠️ Runs in browser |
-
----
-
-## 💼 Pricing
-
-### Community (Free)
-
-- ✅ Unlimited scans
-- ✅ Preview generated Terraform
-- ✅ Basic compliance audit
-- ✅ 7-day history retention
-- 📊 Exports with watermark
-
-### Pro ($29/mo)
-
-- ✅ Everything in Community
-- ✅ Download Terraform code
-- ✅ Cost Diff comparison
-- ✅ 30-day history retention
-- ✅ No watermark on exports
-- ✅ 3 AWS accounts
-- ✅ Email support (48h SLA)
-
-### Team ($99/mo)
-
-- ✅ Everything in Pro
-- ✅ Drift detection & alerts
-- ✅ CI/CD integration (`--fail-on-drift`)
-- ✅ Trust Center compliance
-- ✅ PDF audit reports
-- ✅ 10 AWS accounts
-- ✅ Priority support (24h SLA)
-
-### Sovereign ($2,500/mo)
-
-- ✅ Everything in Team
-- ✅ Offline activation
-- ✅ Digital signatures
-- ✅ APRA/RBNZ compliance
-- ✅ White-label option
-- ✅ Unlimited AWS accounts
-- ✅ Dedicated support (4h SLA)
-
-[View full pricing →](https://www.replimap.com/#pricing)
-
----
-
-## 🔒 Security & Privacy
-
-**Your data never leaves your machine.**
-
-- ✅ RepliMap runs entirely client-side
-- ✅ No cloud account required
-- ✅ Read-only AWS access (no modifications)
-- ✅ Sensitive data (passwords, keys) automatically redacted
-- ✅ SOC2-compliant design
+New types are added based on what real scans encounter — if your account
+leans on something we don't cover yet,
+[tell us](https://github.com/RepliMap/replimap-community/issues).
 
 ---
 
@@ -728,9 +392,9 @@ Understanding what RepliMap can and cannot do helps set correct expectations.
 
 | Capability | Description |
 |------------|-------------|
-| **Read-only scanning** | Uses only `Describe*` and `List*` AWS API calls |
-| **Terraform generation** | Outputs clean HCL with proper variable extraction |
-| **CloudFormation generation** | Outputs YAML/JSON templates |
+| **Read-only scanning** | Uses only `Describe*`, `List*` and `Get*` AWS API calls |
+| **Terraform generation** | Clean HCL resource files + import scaffold — an adoption starting point that validates on day one |
+| **IaC coverage** | Matches live resources against your state files; reports what nobody manages |
 | **Circular dependency resolution** | Automatically splits Security Group cycles |
 | **Read-only field sanitization** | Prevents accidental resource recreation |
 | **Local execution** | All processing happens on your machine |
@@ -739,7 +403,8 @@ Understanding what RepliMap can and cannot do helps set correct expectations.
 
 | Limitation | Explanation |
 |------------|-------------|
-| **No multi-cloud** | AWS only. Azure and GCP are not supported yet. |
+| **No multi-cloud** | AWS only. Azure and GCP are not supported. |
+| **No CloudFormation/Pulumi/CDK output** | Terraform (HCL) only. |
 | **No auto-apply** | Does not run `terraform apply`. You review and apply manually. |
 | **No write operations** | Never creates, modifies, or deletes AWS resources. |
 | **No data access** | Does not read S3 bucket contents, RDS data, or secrets values. |
@@ -747,7 +412,11 @@ Understanding what RepliMap can and cannot do helps set correct expectations.
 
 ### 📊 Current Resource Coverage
 
-24 resource types including: EC2, RDS, Aurora, VPC, Subnet, Security Group, Route Table, NAT Gateway, Internet Gateway, ALB/NLB, S3, EBS, EFS, Lambda, ECS, EKS, ElastiCache, DynamoDB, IAM Role, IAM Policy, KMS, Secrets Manager, CloudWatch, SNS, SQS.
+30+ resource types covering compute, database, network, storage, IAM,
+messaging, and monitoring. Notable gaps today: Lambda, ECS/EKS, DynamoDB,
+KMS, Secrets Manager — if you need one of these,
+[open an issue](https://github.com/RepliMap/replimap-community/issues) and it
+gets prioritized by demand.
 
 Full list: See [Supported Resources](#supported-resources) section above.
 
@@ -760,7 +429,11 @@ Full list: See [Supported Resources](#supported-resources) section above.
 <details>
 <summary><strong>What is RepliMap?</strong></summary>
 
-RepliMap is a CLI tool that scans your AWS account and generates production-ready Terraform code. Unlike simple export tools, it builds a dependency graph of your infrastructure and intelligently resolves issues (like circular dependencies and read-only fields) that would otherwise cause `terraform plan` to fail or destroy resources.
+RepliMap is a CLI tool that scans your AWS account and generates a Terraform
+adoption starting point. Unlike simple export tools, it builds a dependency
+graph of your infrastructure and intelligently resolves issues (like circular
+dependencies and read-only fields) that would otherwise cause
+`terraform plan` to fail or destroy resources.
 
 </details>
 
@@ -772,15 +445,18 @@ RepliMap is a CLI tool that scans your AWS account and generates production-read
 | Dependency graph | ✅ Full graph with cycle detection | ❌ No dependency tracking |
 | Circular dependency handling | ✅ Auto-splits Security Group cycles | ❌ You fix manually |
 | Read-only field sanitization | ✅ Prevents "must be replaced" errors | ❌ Exports raw API values |
-| Code quality | ✅ Variables extracted, clean HCL | ⚠️ Hardcoded values |
-| Cost analysis | ✅ Built-in | ❌ None |
+| IaC coverage | ✅ Match live account vs state files | ❌ None |
+| Visualization | ✅ Interactive, air-gapped HTML | ❌ None |
 
 </details>
 
 <details>
 <summary><strong>How is RepliMap different from Former2?</strong></summary>
 
-Former2 runs in your browser and has memory limitations for large accounts. RepliMap is a CLI tool that runs locally, handles 2000+ resources efficiently, and includes dependency analysis that Former2 lacks.
+Former2 runs in your browser and has memory limitations for large accounts.
+RepliMap is a CLI tool that runs locally, handles 1,500+ resource accounts
+(verified on real production scans), and includes dependency analysis that
+Former2 lacks.
 
 </details>
 
@@ -813,14 +489,30 @@ RepliMap automatically filters these dangerous read-only fields. [Read the full 
 <details>
 <summary><strong>What AWS permissions are required?</strong></summary>
 
-Read-only only. RepliMap uses only `Describe*` and `List*` API calls. See [IAM_POLICY.md](IAM_POLICY.md) for the minimal IAM policy you can copy-paste.
+Read-only only. RepliMap uses only `Describe*`, `List*` and `Get*` API calls. See [IAM_POLICY.md](IAM_POLICY.md) for the minimal IAM policy you can copy-paste.
 
 </details>
 
 <details>
 <summary><strong>Is my data safe?</strong></summary>
 
-Yes. RepliMap runs entirely on your local machine. Your AWS credentials (`~/.aws/credentials`) never leave your laptop. The only network call to RepliMap servers is license key validation — and that sends only a hash, no infrastructure data.
+Yes. RepliMap runs entirely on your local machine. Your AWS credentials
+(`~/.aws/credentials`) never leave your laptop. The only network call to
+RepliMap servers is license validation — no infrastructure data is ever
+transmitted, and license entitlements are verified locally via Ed25519
+signatures. Generated reports and graphs are self-contained files that load
+nothing from the internet. Run `replimap --privacy` for the full statement.
+
+</details>
+
+<details>
+<summary><strong>Does RepliMap work air-gapped?</strong></summary>
+
+Scanning and all reports run fully offline once your license is activated
+(Pro: 7-day offline grace, Team: 14 days between checks). Every generated
+report — including the interactive dependency graph — is a self-contained
+file. Fully offline activation for permanently air-gapped environments is
+part of the Sovereign plan.
 
 </details>
 
@@ -829,16 +521,72 @@ Yes. RepliMap runs entirely on your local machine. Your AWS credentials (`~/.aws
 <details>
 <summary><strong>Does RepliMap support Azure or GCP?</strong></summary>
 
-Not yet. Currently AWS only. Multi-cloud support is being considered based on user demand.
+No. AWS only — and honestly, that focus is the point. Multi-cloud would be
+considered only on overwhelming demand.
 
 </details>
 
 <details>
-<summary><strong>Will RepliMap support Pulumi or CDK output?</strong></summary>
+<summary><strong>Will RepliMap support CloudFormation, Pulumi or CDK output?</strong></summary>
 
-Pulumi TypeScript output is on the roadmap. CDK support is being evaluated.
+Terraform (HCL) is the only supported output today, and nothing else is
+committed. If you'd pay for another format,
+[tell us](https://github.com/RepliMap/replimap-community/issues) — demand
+drives the roadmap.
 
 </details>
+
+---
+
+## 💼 Pricing
+
+**Unlimited scanning. Pay only when you export.**
+
+### Community (Free)
+
+- ✅ Unlimited scans, unlimited resources, 1 AWS account
+- ✅ Interactive dependency graph (self-contained HTML)
+- ✅ Terraform resource files — full account
+- ✅ IaC coverage summary (unmanaged counts)
+- ✅ Audit score + terminal summary
+
+### Pro ($29/mo)
+
+- ✅ Everything in Community
+- ✅ Unlimited AWS accounts (fair use)
+- ✅ `imports.tf` — import scaffold for the whole account
+- ✅ Audit HTML report + SOC 2 evidence export
+- ✅ Full unmanaged-resource list + `coverage.json`
+- ✅ 7-day offline grace period · 48h email support
+
+### Team ($99/mo)
+
+- ✅ Everything in Pro, 5 team members
+- ✅ CI mode with blocking checks (`--fail-on`)
+- ✅ Custom webhook payloads · custom report author tag
+- ✅ 14-day offline grace period · 24h priority support
+
+### Sovereign (from $2,500/mo)
+
+- ✅ Everything in Team — for regulated industries
+- ✅ Fully offline activation / air-gap deployment
+- ✅ SSO (SAML/OIDC) · custom compliance mapping
+
+[View full pricing →](https://www.replimap.com/#pricing)
+
+---
+
+## 🔒 Security & Privacy
+
+**Your data never leaves your machine.**
+
+- ✅ RepliMap runs entirely client-side — no SaaS cloud to trust
+- ✅ Read-only AWS access (no modifications, ever)
+- ✅ Sensitive data (passwords, keys) automatically redacted from output
+- ✅ Generated reports and graphs are self-contained files — zero outbound requests
+- ✅ License entitlements verified locally (Ed25519 signatures) — no phone-home in the scan path
+
+Run `replimap --privacy` for the full data-handling statement.
 
 ---
 
@@ -849,14 +597,19 @@ Found a bug? Have a feature request?
 - [🐛 Report a Bug](https://github.com/RepliMap/replimap-community/issues/new?template=bug_report.md)
 - [💡 Request a Feature](https://github.com/RepliMap/replimap-community/issues/new?template=feature_request.md)
 
+When a command fails, RepliMap prints an error reference (e.g.
+`ERR-EC2-403-A7X9`) and saves a local log — run
+`replimap explain ERR-EC2-403-A7X9` and paste the summary into your issue.
+
 We read every issue. Your feedback shapes the roadmap.
 
 ---
 
 ## Documentation
 
-- [IAM Policy](IAM_POLICY.md)
 - [Full Documentation](https://replimap.com/docs)
+- [IAM Policy](IAM_POLICY.md)
+- [Changelog](CHANGELOG.md)
 - [Pricing](https://www.replimap.com/#pricing)
 
 ---
@@ -882,13 +635,6 @@ We read every issue. Your feedback shapes the roadmap.
 ## 📄 License
 
 RepliMap is licensed under the [Business Source License 1.1](LICENSE).
-
-- **Community (Free)**: Unlimited scans, preview Terraform, basic audit, 7-day history
-- **Pro ($29/mo)**: Download code, Cost Diff, 30-day history, 3 accounts
-- **Team ($99/mo)**: Drift detection, CI/CD integration, PDF reports, 10 accounts
-- **Sovereign ($2,500/mo)**: Offline activation, APRA/RBNZ compliance, unlimited accounts
-
-[View full pricing →](https://www.replimap.com/#pricing)
 
 ---
 

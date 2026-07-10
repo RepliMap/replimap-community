@@ -3,7 +3,7 @@
   "@type": "SoftwareSourceCode",
   "name": "RepliMap",
   "description": "Read-only CLI to reverse-engineer AWS infrastructure into Terraform, with automatic circular dependency resolution using Tarjan's algorithm.",
-  "version": "1.0.0",
+  "version": "0.4.11",
   "programmingLanguage": ["Python"],
   "runtimePlatform": ["Python 3.10+"],
   "operatingSystem": ["macOS", "Linux", "Windows"],
