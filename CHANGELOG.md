@@ -33,6 +33,22 @@ visible on [PyPI](https://pypi.org/project/replimap/#history).
 
 ### Changed
 
+- **Drift comparison is free on every tier** — `replimap drift` /
+  `drift-offline` no longer require a paid plan (it's experimental and not
+  part of any tier); both commands print an honest note that
+  `terraform plan` is the better answer for "did what I manage change?",
+  and point at IaC Coverage for "what exists in NO state?".
+- **Documented tiers are now enforced** — `trust-center` (Team),
+  regional audit frameworks `apra_cps234`/`rbnz_bs11`/`nzism` (Sovereign),
+  and `remediate` (Pro, same gate as `audit --fix`) previously ran ungated;
+  they now match the published feature matrix. `scan --trust-center` on
+  lower plans warns and continues the scan without auditing — the scan
+  itself never fails.
+- **TEAM AWS account limit is now unlimited (fair use)** — matching PRO;
+  no account-count-based upgrade trigger remains on any paid plan.
+- **Upgrade prompts honesty pass** — upsell panels no longer mention
+  unshipped or retired features (PDF exports, drift alerts, retention
+  tiers); they list only what the plan actually includes.
 - **Self-contained graph HTML** — D3 is inlined and all CDN references are
   removed; the interactive graph renders fully air-gapped, with hierarchical
   VPC/subnet containers, viewport-aware fit, and a collapsible filter panel.
