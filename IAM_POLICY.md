@@ -21,7 +21,6 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "s3:GetLifecycleConfiguration",
                 "s3:GetEncryptionConfiguration",
                 "s3:GetReplicationConfiguration",
-                "s3:GetObject",
                 "s3:ListAllMyBuckets",
                 "elasticache:Describe*",
                 "elasticache:ListTagsForResource",
@@ -65,10 +64,26 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
 > or codify Lambda functions**: `replimap deps` (Pro+) resolves *cross-service*
 > dependencies — e.g. which Lambda functions use a security group, or which
 > policies are attached to an IAM role — read-only, and never generates
-> Terraform for those resources. `s3:GetObject` and `sts:GetSessionToken` are
-> needed only for `replimap drift --state-bucket` (reading a remote Terraform
-> state object) and the optional MFA session-refresh path, respectively —
-> ordinary scanning never calls either.
+> Terraform for those resources. `sts:GetSessionToken` is used only by the
+> optional MFA session-refresh path.
+
+### Optional: remote Terraform state for `drift --state-bucket`
+
+The policy above grants **no** access to S3 object contents. Only if you run
+`replimap drift --state-bucket`, add a separate statement scoped to the single
+state object RepliMap should read (replace the bucket and key):
+
+```json
+{
+    "Sid": "RepliMapReadTerraformState",
+    "Effect": "Allow",
+    "Action": "s3:GetObject",
+    "Resource": "arn:aws:s3:::YOUR-STATE-BUCKET/path/to/terraform.tfstate"
+}
+```
+
+If your state bucket uses SSE-KMS, the principal also needs `kms:Decrypt` on
+that bucket's key.
 
 ---
 
