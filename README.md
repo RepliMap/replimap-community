@@ -364,7 +364,7 @@ source for the [website CLI reference](https://www.replimap.com/docs/cli-referen
 | `replimap codify` | Turn ClickOps AWS into a Terraform adoption starting point + import scaffold |
 | `replimap remediate` | Generate Terraform remediation code from an audit JSON file |
 | `replimap analyze` | Critical resources, SPOFs, and blast radius from the cached scan |
-| `replimap deps` | Explore dependencies for a resource |
+| `replimap deps` | Explore dependencies for a resource (Pro+) |
 | `replimap drift` | Drift detection between Terraform state and AWS (free, experimental) |
 | `replimap drift-offline` | Offline drift detection against a saved scan |
 | `replimap validate` | Validate infrastructure against topology constraints |
