@@ -5,8 +5,8 @@ abstract: "A reverse-engineering engine that converts existing AWS infrastructur
 authors:
   - family-names: "Lu"
     given-names: "David"
-version: "0.4.11"
-date-released: "2026-07-10"
+version: "0.5.8"
+date-released: "2026-08-10"
 license: "BUSL-1.1"
 repository-code: "https://github.com/RepliMap/replimap-community"
 url: "https://replimap.com"

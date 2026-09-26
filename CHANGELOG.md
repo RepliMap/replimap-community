@@ -9,7 +9,10 @@ visible on [PyPI](https://pypi.org/project/replimap/#history).
 
 ---
 
-## [0.4.x] - 2026-07
+## [0.4.12 – 0.5.0] - 2026-08-10
+
+_Aggregates several patch releases between 0.4.12 and 0.5.0; see
+[PyPI](https://pypi.org/project/replimap/#history) for exact version boundaries._
 
 ### Added
 
@@ -75,6 +78,61 @@ visible on [PyPI](https://pypi.org/project/replimap/#history).
   one.
 - Interactive MFA prompts in non-interactive environments now produce a clear
   "re-authenticate profile X" message instead of a bare `EOFError`.
+- **`prevent_destroy` now actually reaches generated Terraform** for
+  protected resources (databases, S3 buckets, KMS keys, etc.) — the
+  completion summary's count was correct, but the protection itself wasn't
+  making it into the file.
+- **Aurora read replicas managed by Application Auto Scaling** are no longer
+  generated as importable resources, since their lifecycle belongs to the
+  autoscaling policy, not a static import.
+- **Resources sharing the same Name tag** (e.g. members of the same cluster)
+  no longer get randomly mismatched Terraform block names.
+
+---
+
+## [0.5.8] - 2026-08-10
+
+### Changed
+- Internal licensing cleanup (removed unused fields left over from the
+  0.5.0 command removals); no change to plan gating or `license status`.
+
+## [0.5.7] - 2026-08-10
+
+### Fixed
+- Drift: a cache from `scan --types <subset>` no longer reports resources of
+  an unscanned type as deleted from AWS.
+- CLI: `deps`, `graph`, `residency`, and `iam` now honor the global
+  `-p`/`--profile` flag correctly.
+
+## [0.5.6] - 2026-08-10
+
+No user-facing changes in this release.
+
+## [0.5.5] - 2026-08-10
+
+### Changed
+- Docs: the CLI reference is now regenerated from `--help` output instead of
+  a hand-maintained command table that kept going stale.
+
+## [0.5.4] - 2026-08-10
+
+### Fixed
+- Drift: tag comparisons no longer falsely report every managed resource's
+  tags as drift.
+
+## [0.5.3] - 2026-08-10
+
+No user-facing changes in this release.
+
+## [0.5.2] - 2026-08-10
+
+### Fixed
+- Scan: RDS scanner no longer misclassifies DocumentDB/Neptune clusters as
+  `aws_rds_cluster`.
+
+## [0.5.1] - 2026-08-10
+
+Version housekeeping only; ships the changes listed under 0.4.12–0.5.0 above.
 
 ### Deprecated (zero breakage — old spellings keep working with a notice)
 

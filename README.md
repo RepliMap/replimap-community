@@ -165,6 +165,9 @@ terraform/
 **Why RepliMap's generation holds up on real accounts:**
 
 - ✅ **Handles `root_block_device` defaults** — prevents accidental EC2 replacement ([see the trap](https://www.reddit.com/r/devops/comments/1qiun82/psa_the_root_block_device_gotcha_that_almost_cost/))
+- ✅ **Aurora cluster support** — Aurora is modeled as `aws_rds_cluster` /
+  `aws_rds_cluster_instance` (not flattened into standalone `aws_db_instance`
+  blocks), with `prevent_destroy` and correct cluster-to-member references
 - ✅ **Resolves circular dependencies** — auto-splits Security Group rules
 - ✅ **Filters AWS system tags** — no more `aws:*` tag rejection errors
 - ✅ **Lifecycle protection** — `prevent_destroy` on databases and storage by default
@@ -197,8 +200,7 @@ list and machine-readable `coverage.json` are Pro.
 **Evidence, not screenshots.**
 
 Run a SOC 2-mapped audit against live AWS (Checkov-powered) and export the
-findings as an evidence package your auditor can actually use. Frameworks:
-SOC 2, APRA CPS 234, RBNZ BS11, NZISM.
+findings as an evidence package your auditor can actually use.
 
 ```bash
 # Full terminal summary (score, grade, top issues) — free
@@ -206,6 +208,29 @@ replimap -p prod -r us-east-1 audit
 
 # HTML report + SOC 2 evidence export — Pro
 replimap audit -p prod --state ./terraform.tfstate
+```
+
+SOC 2 is available on every plan (evidence export is Pro). The regional
+frameworks — **APRA CPS 234**, **RBNZ BS11**, and **NZISM** — are gated to
+the **Sovereign** plan; `--framework apra_cps234/rbnz_bs11/nzism` on a lower
+plan is blocked before any AWS call, and `--framework all` degrades to SOC 2
+with a notice.
+
+### 🔐 Trust Center & Remediate
+
+**Trust Center** (`replimap trust-center`, Team+) records every AWS API call
+a scan makes and produces a call-log/session audit trail — `status` and
+`clear` are free on every plan; the exportable `trust-center report` is
+Team+. **Remediate** (`replimap remediate`, Pro+) reads an `audit --format json`
+findings file and generates the corresponding Terraform remediation code,
+using the same gate as `audit --fix`.
+
+```bash
+replimap scan -p prod --trust-center
+replimap trust-center status
+
+replimap audit -p prod -f json -o findings.json
+replimap remediate findings.json -o ./remediation
 ```
 
 ### 🛡️ IAM Generation
@@ -322,21 +347,49 @@ terraform validate
 
 ## 📖 Commands
 
+RepliMap ships 23 commands: the core workflow you use on every account, plus
+a smaller set of utility commands for configuration and troubleshooting.
+Run `replimap --help` for the grouped list, or `replimap <command> --help`
+for full flags on any command — that's the authoritative reference and the
+source for the [website CLI reference](https://www.replimap.com/docs/cli-reference).
+
+### Core commands
+
 | Command | Description |
 |---------|-------------|
-| `replimap scan` | Scan AWS resources and build dependency graph |
-| `replimap codify` | Turn ClickOps AWS into a Terraform adoption starting point + import scaffold |
+| `replimap scan` | Scan AWS resources and build a dependency graph |
 | `replimap graph` | Interactive dependency graph (self-contained HTML) |
-| `replimap deps` | Explore dependencies and blast radius for a resource |
-| `replimap analyze` | Critical resources, SPOFs, blast radius from the cached scan |
-| `replimap audit` | Security & compliance audit (SOC 2 / APRA / RBNZ / NZISM) |
+| `replimap load` | Load and display a saved graph |
+| `replimap profiles` | List available AWS profiles |
+| `replimap codify` | Turn ClickOps AWS into a Terraform adoption starting point + import scaffold |
+| `replimap remediate` | Generate Terraform remediation code from an audit JSON file |
+| `replimap analyze` | Critical resources, SPOFs, and blast radius from the cached scan |
+| `replimap deps` | Explore dependencies for a resource |
+| `replimap drift` | Drift detection between Terraform state and AWS (free, experimental) |
+| `replimap drift-offline` | Offline drift detection against a saved scan |
+| `replimap validate` | Validate infrastructure against topology constraints |
+| `replimap audit` | Security & compliance audit (SOC 2 / APRA CPS 234 / RBNZ BS11 / NZISM) |
+| `replimap residency` | Validate data residency compliance for NZ/AU sovereignty |
 | `replimap iam` | Generate least-privilege IAM policies from graph analysis |
-| `replimap cost` | Estimate monthly AWS costs (estimates, clearly labeled) |
-| `replimap drift` | Drift detection between Terraform state and AWS (experimental) |
-| `replimap doctor` | Environment health checks |
+| `replimap trust-center` | Trust Center API-call auditing for compliance evidence |
 
-Run `replimap --help` for the full list (cache management, license, error
-explain, and more).
+### Utility commands
+
+| Command | Description |
+|---------|-------------|
+| `replimap doctor` | Environment health checks |
+| `replimap cache` | Credential cache management |
+| `replimap scan-cache` | Scan result cache management |
+| `replimap license` | License management |
+| `replimap upgrade` | Upgrade your RepliMap plan |
+| `replimap completion` | Generate shell completion scripts |
+| `replimap explain` | Get detailed information about an error code |
+| `replimap errors` | List all error codes |
+
+> **Removed in 0.5.0**: `cost`, `clone`, `snapshot`, `dr`, `trends`, `transfer`,
+> `unused`, and `decisions` were dropped from the CLI surface (low organic
+> usage on a solo-maintained tool). Terraform is the only generation output —
+> CloudFormation and Pulumi output were removed along with `clone`.
 
 ---
 
@@ -372,7 +425,7 @@ account:
 | Category | Resources |
 |----------|-----------|
 | **Compute** | EC2, Auto Scaling Groups, Launch Templates, EBS, EIP |
-| **Database** | RDS (+ subnet & parameter groups), ElastiCache (+ subnet groups) |
+| **Database** | RDS (+ subnet & parameter groups), Aurora clusters (`aws_rds_cluster` / `aws_rds_cluster_instance`), ElastiCache (+ subnet groups) |
 | **Network** | VPC, Subnet, Security Group, Route Table, NACL, IGW, NAT Gateway, VPC Endpoint, ALB/NLB (+ listeners & target groups) |
 | **Storage** | S3 buckets & bucket policies |
 | **Security** | IAM Roles, IAM Policies, Instance Profiles |
@@ -566,10 +619,11 @@ drives the roadmap.
 - ✅ Custom webhook payloads · custom report author tag
 - ✅ 14-day offline grace period · 24h priority support
 
-### Sovereign (from $2,500/mo)
+### Sovereign ($2,500/mo, contact sales)
 
 - ✅ Everything in Team — for regulated industries
 - ✅ Fully offline activation / air-gap deployment
+- ✅ Regional audit frameworks: APRA CPS 234, RBNZ BS11, NZISM
 - ✅ SSO (SAML/OIDC) · custom compliance mapping
 
 [View full pricing →](https://www.replimap.com/#pricing)
@@ -607,7 +661,7 @@ We read every issue. Your feedback shapes the roadmap.
 
 ## Documentation
 
-- [Full Documentation](https://replimap.com/docs)
+- [Full Documentation](https://www.replimap.com/docs)
 - [IAM Policy](IAM_POLICY.md)
 - [Changelog](CHANGELOG.md)
 - [Pricing](https://www.replimap.com/#pricing)
@@ -626,7 +680,7 @@ We read every issue. Your feedback shapes the roadmap.
 ## Links
 
 - Website: [replimap.com](https://replimap.com)
-- Documentation: [replimap.com/docs](https://replimap.com/docs)
+- Documentation: [replimap.com/docs](https://www.replimap.com/docs)
 - Pricing: [replimap.com/#pricing](https://www.replimap.com/#pricing)
 - Twitter: [@replimap_io](https://twitter.com/replimap_io)
 
