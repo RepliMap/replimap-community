@@ -19,6 +19,9 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "rds:ListTagsForResource",
                 "s3:GetBucket*",
                 "s3:GetLifecycleConfiguration",
+                "s3:GetEncryptionConfiguration",
+                "s3:GetReplicationConfiguration",
+                "s3:GetObject",
                 "s3:ListAllMyBuckets",
                 "elasticache:Describe*",
                 "elasticache:ListTagsForResource",
@@ -27,9 +30,17 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "iam:ListRoles",
                 "iam:ListPolicies",
                 "iam:ListInstanceProfiles",
+                "iam:ListInstanceProfilesForRole",
+                "iam:ListAttachedRolePolicies",
+                "iam:ListRolePolicies",
                 "iam:ListRoleTags",
+                "iam:ListAccessKeys",
                 "iam:GetRole",
                 "iam:GetPolicy",
+                "iam:GetInstanceProfile",
+                "lambda:ListFunctions",
+                "lambda:GetFunction",
+                "lambda:ListEventSourceMappings",
                 "sqs:GetQueueAttributes",
                 "sqs:ListQueues",
                 "sqs:ListQueueTags",
@@ -39,14 +50,25 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "logs:DescribeLogGroups",
                 "logs:ListTagsLogGroup",
                 "cloudwatch:DescribeAlarms",
+                "cloudwatch:ListTagsForResource",
                 "tag:GetResources",
-                "sts:GetCallerIdentity"
+                "sts:GetCallerIdentity",
+                "sts:GetSessionToken"
             ],
             "Resource": "*"
         }
     ]
 }
 ```
+
+> **Why Lambda/IAM-policy actions are here even though RepliMap doesn't scan
+> or codify Lambda functions**: `replimap deps` (Pro+) resolves *cross-service*
+> dependencies — e.g. which Lambda functions use a security group, or which
+> policies are attached to an IAM role — read-only, and never generates
+> Terraform for those resources. `s3:GetObject` and `sts:GetSessionToken` are
+> needed only for `replimap drift --state-bucket` (reading a remote Terraform
+> state object) and the optional MFA session-refresh path, respectively —
+> ordinary scanning never calls either.
 
 ---
 
@@ -104,10 +126,15 @@ replimap doctor --profile replimap
 | Read resource metadata | Create any resources |
 | Read tags and configurations | Modify any resources |
 | Read network topology | Delete any resources |
-| Process data locally | Access S3 object contents |
+| Process data locally | Access S3 object contents\* |
 | Generate Terraform code | Read database contents |
 | | Store your credentials |
 | | Upload data to external services |
+
+\* One exception: `replimap drift --state-bucket` reads the single Terraform
+state object you point it at (to compare against live AWS) — never any other
+S3 object. Everyday scanning (`scan`, `codify`, `audit`, local `drift`) never
+calls `s3:GetObject`.
 
 ---
 
