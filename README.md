@@ -647,7 +647,7 @@ drives the roadmap.
 ### Pro ($29/mo)
 
 - ✅ Everything in Community
-- ✅ Unlimited AWS accounts (fair use)
+- ✅ Unlimited AWS accounts (fair use) · 2 activated devices
 - ✅ `imports.tf` — import scaffold for the whole account
 - ✅ Audit HTML report + SOC 2 evidence export
 - ✅ Full unmanaged-resource list + `coverage.json`
@@ -655,9 +655,10 @@ drives the roadmap.
 
 ### Team ($99/mo)
 
-- ✅ Everything in Pro, 5 team members
-- ✅ CI mode with blocking checks (`--fail-on`)
-- ✅ Custom webhook payloads · custom report author tag
+- ✅ Everything in Pro
+- ✅ CI mode with blocking checks (`--fail-on` on `audit`)
+- ✅ Trust Center report
+- ✅ 10 activated devices (Pro: 2)
 - ✅ 14-day offline grace period · 24h priority support
 
 ### Sovereign ($2,500/mo, contact sales)
@@ -665,7 +666,7 @@ drives the roadmap.
 - ✅ Everything in Team — for regulated industries
 - ✅ Air-gapped activation by signed license file, issued on request (from 0.6.1) · 30-day offline grace
 - ✅ Regional audit frameworks: APRA CPS 234, RBNZ BS11, NZISM
-- ✅ SSO (SAML/OIDC) · custom compliance mapping
+- ✅ Unlimited activated devices
 
 [View full pricing →](https://www.replimap.com/#pricing)
 
