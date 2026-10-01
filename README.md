@@ -386,7 +386,7 @@ source for the [website CLI reference](https://www.replimap.com/docs/cli-referen
 | `replimap doctor` | Environment health checks |
 | `replimap cache` | Credential cache management |
 | `replimap scan-cache` | Scan result cache management |
-| `replimap license` | License management |
+| `replimap license` | License management: `activate <KEY>`, `status`, `usage`, `deactivate`; from 0.6.1 also `machine-id` and `activate --file <path>` (offline, Sovereign) |
 | `replimap upgrade` | Upgrade your RepliMap plan |
 | `replimap completion` | Generate shell completion scripts |
 | `replimap explain` | Get detailed information about an error code |
@@ -592,11 +592,21 @@ nothing from the internet. Run `replimap --privacy` for the full statement.
 <details>
 <summary><strong>Does RepliMap work air-gapped?</strong></summary>
 
-Scanning and all reports run fully offline once your license is activated
-(Pro: 7-day offline grace, Team: 14 days between checks). Every generated
-report — including the interactive dependency graph — is a self-contained
-file. Fully offline activation for permanently air-gapped environments is
-part of the Sovereign plan.
+Scanning and all reports run fully offline. Every generated report,
+including the interactive dependency graph, is a self-contained file.
+
+- **Online activation (all paid plans)** needs one network call at activation.
+  After that the license is verified locally from a signed license until it
+  expires. After the paid period ends, offline grace is 7 days on Pro, 14 days
+  on Team and 30 days on Sovereign.
+- **Air-gapped activation (Sovereign only)** needs no network call on the
+  isolated host. RepliMap issues a signed license file on request; it is not
+  self-service. The file is bound to one machine and expires on the date set at
+  issuance. Available from 0.6.1:
+  1. On the isolated host, run `replimap license machine-id`.
+  2. Send that machine id to RepliMap; RepliMap issues a signed license file
+     for that machine.
+  3. On the isolated host, run `replimap license activate --file <path>`.
 
 </details>
 
@@ -653,7 +663,7 @@ drives the roadmap.
 ### Sovereign ($2,500/mo, contact sales)
 
 - ✅ Everything in Team — for regulated industries
-- ✅ Fully offline activation / air-gap deployment
+- ✅ Air-gapped activation by signed license file, issued on request (from 0.6.1) · 30-day offline grace
 - ✅ Regional audit frameworks: APRA CPS 234, RBNZ BS11, NZISM
 - ✅ SSO (SAML/OIDC) · custom compliance mapping
 
