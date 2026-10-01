@@ -386,7 +386,7 @@ source for the [website CLI reference](https://www.replimap.com/docs/cli-referen
 | `replimap doctor` | Environment health checks |
 | `replimap cache` | Credential cache management |
 | `replimap scan-cache` | Scan result cache management |
-| `replimap license` | License management: `activate <KEY>`, `status`, `usage`, `deactivate`; from 0.6.1 also `machine-id` and `activate --file <path>` (offline, Sovereign) |
+| `replimap license` | License management: `activate <KEY>`, `status`, `usage`, `deactivate`; also `machine-id` and `activate --file <path>` (offline, Sovereign) |
 | `replimap upgrade` | Upgrade your RepliMap plan |
 | `replimap completion` | Generate shell completion scripts |
 | `replimap explain` | Get detailed information about an error code |
@@ -602,7 +602,7 @@ including the interactive dependency graph, is a self-contained file.
 - **Air-gapped activation (Sovereign only)** needs no network call on the
   isolated host. RepliMap issues a signed license file on request; it is not
   self-service. The file is bound to one machine and expires on the date set at
-  issuance. Available from 0.6.1:
+  issuance.:
   1. On the isolated host, run `replimap license machine-id`.
   2. Send that machine id to RepliMap; RepliMap issues a signed license file
      for that machine.
@@ -664,7 +664,7 @@ drives the roadmap.
 ### Sovereign ($2,500/mo, contact sales)
 
 - ✅ Everything in Team — for regulated industries
-- ✅ Air-gapped activation by signed license file, issued on request (from 0.6.1) · 30-day offline grace
+- ✅ Air-gapped activation by signed license file, issued on request · 30-day offline grace
 - ✅ Regional audit frameworks: APRA CPS 234, RBNZ BS11, NZISM
 - ✅ Unlimited activated devices
 

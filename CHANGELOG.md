@@ -9,6 +9,24 @@ visible on [PyPI](https://pypi.org/project/replimap/#history).
 
 ---
 
+## [0.6.1] - 2026-10-01
+
+### Added
+- Air-gapped activation for the Sovereign plan: `replimap license activate --file <path>` imports a signed license file with zero network calls, and `replimap license machine-id` prints the id to request one (with `--format json`, and a warning when the id comes from the `~/.replimap/.device_id` fallback, which does not survive containers). The file's signature, signing key, expiry, not-before, clock rollback, machine binding and plan are all verified before the license cache is replaced atomically; any failure leaves the existing cache untouched. Files not bound to a machine, and non-Sovereign files, are refused. `license status` shows when a license was activated from a file. See "Air-gapped activation" in `docs/technical-reference.md`.
+
+### Changed
+- Plan descriptions (README, `replimap upgrade`, upgrade prompts, `replimap license status`, pricing reference) no longer list features that are not implemented: team seats, custom webhook payloads, custom report author tag, and SSO. The Team plan is described by what it adds: CI mode with blocking checks, the Trust Center report, 10 activated devices and a 14-day offline grace.
+- `codify`: Terraform resource names for load balancers, listeners, target groups, auto scaling groups, SQS queues, SNS topics and secrets that have no usable `Name` tag are now derived from the resource name (listeners: `<lb>_<protocol>_<port>`) instead of the whole ARN, so addresses read like `aws_lb_listener.acme_shop_web_https_443` and no longer embed the account id or region. Same-named resources of one type get a short stable suffix. Existing configurations generated earlier will see different resource addresses on regeneration.
+- The license cache `~/.replimap/license.json` is now written with mode 0600 (POSIX) and atomically, for online activation too.
+
+### Fixed
+- `codify`: the default VPC, default security groups, main route tables and default subnets are skipped again on real scanner output. An earlier pipeline stage removed the fields the default-resource filter relies on, so these AWS-managed defaults were being generated and imported.
+- Scan: the KMS, ECS and Secrets Manager scanners no longer depend on each other in a cycle, which could leave task-definition secret references and key edges pointing at placeholder nodes.
+- Scan: SQS dead-letter queue edges no longer depend on the order in which queues are scanned.
+
+### Security
+- Dependency updates clearing known advisories in runtime dependencies (anyio, urllib3, click).
+
 ## [0.6.0] - 2026-10-01
 
 ### Added
