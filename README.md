@@ -602,7 +602,7 @@ including the interactive dependency graph, is a self-contained file.
 - **Air-gapped activation (Sovereign only)** needs no network call on the
   isolated host. RepliMap issues a signed license file on request; it is not
   self-service. The file is bound to one machine and expires on the date set at
-  issuance.:
+  issuance. The steps:
   1. On the isolated host, run `replimap license machine-id`.
   2. Send that machine id to RepliMap; RepliMap issues a signed license file
      for that machine.
