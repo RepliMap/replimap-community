@@ -26,6 +26,26 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "elasticache:ListTagsForResource",
                 "elasticloadbalancing:Describe*",
                 "autoscaling:Describe*",
+                "route53:ListHostedZones",
+                "route53:GetHostedZone",
+                "route53:ListResourceRecordSets",
+                "route53:ListTagsForResource",
+                "acm:ListCertificates",
+                "acm:DescribeCertificate",
+                "acm:ListTagsForCertificate",
+                "cloudfront:ListDistributions",
+                "cloudfront:GetDistributionConfig",
+                "cloudfront:ListTagsForResource",
+                "ecs:ListClusters",
+                "ecs:DescribeClusters",
+                "ecs:ListServices",
+                "ecs:DescribeServices",
+                "ecs:ListTaskDefinitionFamilies",
+                "ecs:ListTaskDefinitions",
+                "ecs:DescribeTaskDefinition",
+                "ecs:ListTagsForResource",
+                "ecr:DescribeRepositories",
+                "ecr:ListTagsForResource",
                 "iam:ListRoles",
                 "iam:ListPolicies",
                 "iam:ListInstanceProfiles",
@@ -33,13 +53,22 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "iam:ListAttachedRolePolicies",
                 "iam:ListRolePolicies",
                 "iam:ListRoleTags",
+                "iam:ListInstanceProfileTags",
                 "iam:ListAccessKeys",
                 "iam:GetRole",
                 "iam:GetPolicy",
                 "iam:GetInstanceProfile",
                 "lambda:ListFunctions",
-                "lambda:GetFunction",
+                "lambda:GetFunctionConfiguration",
                 "lambda:ListEventSourceMappings",
+                "lambda:ListTags",
+                "lambda:GetFunctionUrlConfig",
+                "lambda:GetPolicy",
+                "dynamodb:ListTables",
+                "dynamodb:DescribeTable",
+                "dynamodb:ListTagsOfResource",
+                "dynamodb:DescribeContinuousBackups",
+                "dynamodb:DescribeTimeToLive",
                 "sqs:GetQueueAttributes",
                 "sqs:ListQueues",
                 "sqs:ListQueueTags",
@@ -50,22 +79,117 @@ RepliMap requires **read-only** access to scan your AWS resources. We never crea
                 "logs:ListTagsLogGroup",
                 "cloudwatch:DescribeAlarms",
                 "cloudwatch:ListTagsForResource",
+                "secretsmanager:ListSecrets",
+                "secretsmanager:DescribeSecret",
+                "ssm:DescribeParameters",
+                "ssm:ListTagsForResource",
+                "kms:ListKeys",
+                "kms:DescribeKey",
+                "kms:ListAliases",
+                "kms:ListResourceTags",
+                "kms:GetKeyRotationStatus",
+                "kms:GetKeyPolicy",
                 "tag:GetResources",
                 "sts:GetCallerIdentity",
                 "sts:GetSessionToken"
             ],
             "Resource": "*"
+        },
+        {
+            "Sid": "RepliMapApiGatewayRead",
+            "Effect": "Allow",
+            "Action": "apigateway:GET",
+            "Resource": [
+                "arn:aws:apigateway:*::/restapis",
+                "arn:aws:apigateway:*::/restapis/*/resources",
+                "arn:aws:apigateway:*::/restapis/*/resources/*/methods/*/integration",
+                "arn:aws:apigateway:*::/restapis/*/stages",
+                "arn:aws:apigateway:*::/restapis/*/authorizers",
+                "arn:aws:apigateway:*::/domainnames",
+                "arn:aws:apigateway:*::/domainnames/*/basepathmappings",
+                "arn:aws:apigateway:*::/domainnames/*/apimappings",
+                "arn:aws:apigateway:*::/vpclinks",
+                "arn:aws:apigateway:*::/apis",
+                "arn:aws:apigateway:*::/apis/*/integrations",
+                "arn:aws:apigateway:*::/apis/*/routes",
+                "arn:aws:apigateway:*::/apis/*/stages",
+                "arn:aws:apigateway:*::/apis/*/authorizers"
+            ]
         }
     ]
 }
 ```
 
-> **Why Lambda/IAM-policy actions are here even though RepliMap doesn't scan
-> or codify Lambda functions**: `replimap deps` (Pro+) resolves *cross-service*
-> dependencies — e.g. which Lambda functions use a security group, or which
-> policies are attached to an IAM role — read-only, and never generates
-> Terraform for those resources. `sts:GetSessionToken` is used only by the
-> optional MFA session-refresh path.
+> **API Gateway** (graph only): `apigateway:GET` is scoped to the specific
+> list endpoints RepliMap calls (REST APIs, resources/integrations, stages,
+> authorizers, custom domains and their mappings, VPC links, and the v2
+> equivalents). It deliberately excludes API keys, usage plans, exports and
+> SDK generation, so API key values can never be read.
+
+> **Lambda and DynamoDB**: RepliMap scans Lambda functions and event source
+> mappings, and DynamoDB table definitions, so serverless chains
+> (API Gateway -> Lambda -> DynamoDB/SQS) appear in the dependency graph.
+> Lambda functions are graph-only (no Terraform is generated for them, because
+> that would need the code package); event source mappings and DynamoDB tables
+> are generated. Lambda environment variable *values* are never stored: only
+> the variable names are kept, redacted at ingestion.
+>
+> **RepliMap never calls `lambda:GetFunction`** (it returns a presigned code
+> download URL), **`lambda:InvokeFunction`**, `lambda:GetLayerVersion`, or any
+> DynamoDB data-plane action (`Scan`, `Query`, `GetItem`, `BatchGetItem`,
+> `ExportTableToPointInTime`). Table items and function code are never read,
+> so none of those permissions are needed.
+>
+> `replimap deps` (Pro+) also uses the IAM-policy actions above to resolve
+> *cross-service* dependencies (e.g. which policies are attached to an IAM
+> role), read-only. `sts:GetSessionToken` is used only by the optional MFA
+> session-refresh path.
+
+> **DNS / certificate / CDN actions** (`route53:*`, `acm:*`, `cloudfront:*`)
+> are all `List*`/`Get*`/`Describe*`. `route53:GetHostedZone` is only called
+> for *private* hosted zones, to read their VPC associations. RepliMap never
+> calls `acm:ExportCertificate` (it returns private keys) or
+> `acm:GetCertificate`. CloudFront certificates live in `us-east-1`, so when
+> you scan another region the ACM calls are also made against `us-east-1`
+> (restricted to certificates a CloudFront distribution uses); if an SCP
+> blocks that region the scan continues without them.
+> **ECS / ECR**: the `ecs:*` / `ecr:*` actions above are metadata reads only.
+> RepliMap never calls `ecr:GetAuthorizationToken`, `ecr:BatchGetImage`,
+> `ecr:GetDownloadUrlForLayer` or `ecs:ExecuteCommand`, so image contents and
+> container shells are unreachable. Task definition environment variable
+> **values** are redacted before storage; only the variable names are kept.
+> `ecs:ListTagsForResource` backs the `include=TAGS` option on the ECS
+> `Describe*` calls.
+
+### EC2 user data
+
+Launch template `UserData` is returned by `ec2:DescribeLaunchTemplateVersions`
+(covered by `ec2:Describe*`). RepliMap reads it in memory and redacts it before
+anything is stored. RepliMap does **not** call `ec2:DescribeInstanceAttribute`,
+so instance user data is never read. `codify` does not emit `user_data` for
+instances or launch templates (it adds `ignore_changes`); see the generated
+comment for how to read it yourself.
+
+### Secrets Manager, SSM Parameter Store and KMS: metadata only
+
+RepliMap maps *where credentials and config live and which key encrypts
+them*, never the credentials themselves. The `secretsmanager:*`, `ssm:*` and
+`kms:*` actions above return names, descriptions, key ids, rotation settings,
+tags and key policy documents only.
+
+RepliMap **never needs** (and the code never calls) any of these, so do not
+grant them:
+
+- `secretsmanager:GetSecretValue`
+- `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath`
+  (these return values even for plain `String` parameters)
+- `kms:Decrypt` (and `kms:Encrypt`, `kms:GenerateDataKey*`)
+
+`kms:GetKeyPolicy` reads the key policy document (never key material) so
+`codify` can emit it and the first plan shows no policy change; a key whose
+policy cannot be read is still scanned, without a `policy`.
+Keys in other accounts, or keys you cannot describe, are skipped without
+failing the scan.
 
 ### Optional: remote Terraform state for `drift --state-bucket`
 

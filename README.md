@@ -171,6 +171,12 @@ terraform/
 - ✅ **Resolves circular dependencies** — auto-splits Security Group rules
 - ✅ **Filters AWS system tags** — no more `aws:*` tag rejection errors
 - ✅ **Lifecycle protection** — `prevent_destroy` on databases and storage by default
+- ✅ **Skips CloudFormation-managed resources** — resources owned by a
+  CloudFormation stack are skipped by default so Terraform and CloudFormation
+  never manage the same resource; pass `--include-cfn-managed` to generate them
+- ✅ **Leaves `user_data` to AWS** — instance and launch template `user_data` is
+  never written (applying a redacted copy would overwrite the real boot script);
+  it is covered by `lifecycle { ignore_changes }`
 - ✅ **Validates on day one** — run `terraform init && terraform validate` on the output immediately
 
 The free tier generates every resource `.tf` file for the whole account, so
@@ -419,17 +425,38 @@ for the complete minimal policy.
 
 ### Supported Resources
 
-RepliMap scans **30+ AWS resource types** — the core of a typical production
-account:
+Resources are listed here only if RepliMap scans them from the AWS API. Types
+marked **graph only** appear in the dependency graph, `graph` and `deps`, but
+`codify` does not emit them as Terraform (it would need data RepliMap refuses to
+read, such as function code or secret values, or the type is not generated yet).
+Everything else is generated as Terraform (`scan` → `codify`).
+
+`codify` also skips resources owned by a CloudFormation stack (tagged
+`aws:cloudformation:stack-id` / `stack-name`): importing them would make
+Terraform and CloudFormation fight over the same resource. The summary shows how
+many were skipped; pass `--include-cfn-managed` to generate them anyway. They
+stay in the scan graph, and `--coverage-state` reports them as auto-created
+rather than actionable. AWS-reserved `aws:` tags are never written to the
+generated Terraform.
+
+<details>
+<summary>View all 39 codified resource types (+ 12 graph-only)</summary>
 
 | Category | Resources |
 |----------|-----------|
-| **Compute** | EC2, Auto Scaling Groups, Launch Templates, EBS, EIP |
-| **Database** | RDS (+ subnet & parameter groups), Aurora clusters (`aws_rds_cluster` / `aws_rds_cluster_instance`), ElastiCache (+ subnet groups) |
-| **Network** | VPC, Subnet, Security Group, Route Table, NACL, IGW, NAT Gateway, VPC Endpoint, ALB/NLB (+ listeners & target groups) |
-| **Storage** | S3 buckets & bucket policies |
-| **Security** | IAM Roles, IAM Policies, Instance Profiles |
-| **Messaging & Monitoring** | SQS, SNS, CloudWatch log groups & alarms |
+| **Network** | VPC, Subnet, Security Group, Route Table, Internet Gateway, NAT Gateway, VPC Endpoint, Network ACL, Elastic IP |
+| **Compute & Load Balancing** | EC2 Instance, Launch Template, Auto Scaling Group, Application/Network Load Balancer (+ target groups, listeners) |
+| **Database** | RDS Instance, Aurora Cluster (+ Cluster Instance), DB Subnet Group, DB Parameter Group, ElastiCache Cluster, ElastiCache Subnet Group, DynamoDB Table |
+| **Storage** | S3 Bucket, S3 Bucket Policy, EBS Volume |
+| **Messaging & Monitoring** | SQS Queue, SNS Topic, CloudWatch Log Group, CloudWatch Metric Alarm |
+| **IAM** | IAM Role, IAM Instance Profile |
+| **DNS, CDN & Certificates** | Route53 Hosted Zone, Route53 Record (incl. alias, weighted and latency records), ACM Certificate, CloudFront Distribution |
+| **Containers** (ECS / ECR) | ECS Cluster, ECR Repository; **graph only:** ECS Service, ECS Task Definition (environment variable values are never stored) |
+| **Serverless** | Lambda Event Source Mapping; **graph only:** Lambda Function (no code download; environment variable values are never stored) |
+| **Secrets & Encryption** | Secrets Manager Secret (metadata only, never the value), KMS Key (customer-managed, including its key policy), KMS Alias; **graph only:** SSM Parameter (never the value) |
+| **API Gateway** (graph only) | REST API, REST Stage, REST Custom Domain, REST VPC Link, HTTP/WebSocket API, HTTP/WebSocket Stage, HTTP/WebSocket Custom Domain, HTTP/WebSocket VPC Link |
+
+</details>
 
 New types are added based on what real scans encounter — if your account
 leans on something we don't cover yet,
@@ -465,9 +492,13 @@ Understanding what RepliMap can and cannot do helps set correct expectations.
 
 ### 📊 Current Resource Coverage
 
-30+ resource types covering compute, database, network, storage, IAM,
-messaging, and monitoring. Notable gaps today: Lambda, ECS/EKS, DynamoDB,
-KMS, Secrets Manager — if you need one of these,
+39 codified resource types plus 12 graph-only types, covering compute, database,
+network, storage, IAM, messaging and monitoring, DNS/CDN/certificates, containers
+(ECS/ECR), serverless (Lambda, DynamoDB), secrets and encryption, and API Gateway.
+Not yet supported: EKS, EFS, CloudTrail, VPC Flow Logs. Lambda functions, ECS
+services/task definitions, API Gateway and SSM parameters are **graph only**: they
+appear in the dependency graph but `codify` does not emit Terraform for them. If
+you need one of the remaining gaps,
 [open an issue](https://github.com/RepliMap/replimap-community/issues) and it
 gets prioritized by demand.
 
